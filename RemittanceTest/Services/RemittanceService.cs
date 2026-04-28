@@ -17,14 +17,16 @@ namespace RemittanceTest.Services
 
         public (bool IsSuccess, string Message) CancelRemittance(int id)
         {
-            // TODO: 請在此處實作「取消」的商業邏輯與防併發檢核
-            var listData = _db.FirstOrDefault(item => item.Id == id);
-            if (listData == null) return (false, "找不到此筆資料");
-            if (listData.Status != 0) return (false, "狀態不符，無法取消");
-            listData.Status = 9;
-            return (true, "取消成功");
-            
-            // 未實作報錯拋出 需拿掉
+            lock (_lockObj)
+            {
+                // TODO: 請在此處實作「取消」的商業邏輯與防併發檢核
+                var listData = _db.FirstOrDefault(item => item.Id == id);
+                if (listData == null) return (false, "找不到此筆資料");
+                if (listData.Status != 0) return (false, "狀態不符，無法取消");
+                listData.Status = 9;
+                return (true, "取消成功");
+            }
+            // 
             // throw new NotImplementedException();
         }
     }
