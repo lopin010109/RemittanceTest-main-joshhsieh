@@ -216,6 +216,96 @@ async function cancel(id) {
 
 本質不同，但結果一樣會有競爭問題。
 
+**Q: `[ApiController]` 是陣列嗎？**
+
+不是，這是 C# 的 **Attribute（屬性標記）**，用 `[]` 包起來放在 class 或方法上面，告訴框架這個 class 有什麼特性或行為。類比 TypeScript 的 Decorator（`@`）：
+
+```typescript
+// TypeScript Decorator
+@Controller('api/remittance')
+export class RemittanceController {}
+```
+
+```csharp
+// C# Attribute
+[ApiController]
+[Route("api/[controller]")]
+public class RemittanceController : ControllerBase {}
+```
+
+`[ApiController]` 有實際功能，會自動幫你：
+- 驗證 Model 輸入，失敗直接回傳 400
+- 自動從 Request Body 綁定參數
+
+`[Route("api/[controller]")]` 定義路由，`[controller]` 會自動替換成 class 名稱去掉 Controller，所以路由是 `api/remittance`。
+
+**Q: 建構子（Constructor）是什麼？**
+
+建構子是**物件被建立時自動執行的方法**，用來初始化物件需要的東西。
+
+```javascript
+// JS
+class RemittanceController {
+    constructor(service) {
+        this.service = service; // 建立時自動執行
+    }
+}
+```
+
+```csharp
+// C# — 用 class 名稱當建構子，不用 constructor 關鍵字
+public class RemittanceController : ControllerBase
+{
+    private readonly IRemittanceService _service;
+
+    public RemittanceController(IRemittanceService service)
+    {
+        _service = service;
+    }
+}
+```
+
+**Q: Controller 怎麼拿到 RemittanceService 裡的邏輯？**
+
+透過 DI 的整條流程：
+
+```
+Program.cs 註冊：AddScoped<IRemittanceService, RemittanceService>()
+    ↓
+Controller 建構子說「我要 IRemittanceService」
+    ↓
+DI 容器把 RemittanceService 塞進來
+    ↓
+Controller 透過 _service 呼叫你寫的邏輯
+```
+
+這是 ASP.NET Core 的標準規範，也是通用設計模式，NestJS、Spring、Angular 都一樣。
+
+**Q: Controller 怎麼回傳 HTTP 狀態碼？**
+
+ASP.NET Core 內建語法糖，直接用方法名稱回傳：
+
+```csharp
+return Ok(result.Message);       // 200
+return BadRequest(result.Message); // 400
+return NotFound(result.Message);   // 404
+```
+
+背後實際是：
+```csharp
+return new OkObjectResult(result.Message);
+return new BadRequestObjectResult(result.Message);
+return new NotFoundObjectResult(result.Message);
+```
+
+根據 Service 回傳結果判斷：
+```csharp
+var result = _service.CancelRemittance(id);
+if (result.IsSuccess) return Ok(result.Message);
+if (result.Message == "找不到此筆資料") return NotFound(result.Message);
+return BadRequest(result.Message);
+```
+
 ---
 
 ## 專案架構
