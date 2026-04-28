@@ -306,6 +306,42 @@ if (result.Message == "找不到此筆資料") return NotFound(result.Message);
 return BadRequest(result.Message);
 ```
 
+**Q: 真實資料庫環境下怎麼防 Race Condition？**
+
+有兩種思路：
+
+**樂觀鎖**（不鎖，寫入時檢查）— 適合衝突機率低的情境：
+
+T-SQL：
+```sql
+UPDATE Remittances
+SET Status = 9
+WHERE Id = @id AND Status = 0
+-- 影響 0 筆代表失敗（狀態已被改或找不到）
+```
+
+EF Core：
+```csharp
+var affected = await db.Remittances
+    .Where(x => x.Id == id && x.Status == 0)
+    .ExecuteUpdateAsync(x => x.SetProperty(r => r.Status, 9));
+
+if (affected == 0) return (false, "狀態不符或找不到");
+return (true, "取消成功");
+```
+
+**悲觀鎖**（查詢時就鎖住）— 適合衝突機率高的情境，但效能較差。
+
+關鍵概念：把**條件放在更新裡**，讓資料庫保證查詢和更新是原子操作，不需要額外加鎖。
+
+**Q: T-SQL 是什麼？**
+
+T-SQL（Transact-SQL）是 Microsoft SQL Server 的 SQL 方言，在標準 SQL 上加了微軟自己擴充的語法。基本的 `SELECT`、`UPDATE`、`WHERE` 都一樣，部分語法是 SQL Server 特有的（例如 `TOP`、`GETDATE()`）。
+
+**Q: EF Core 是什麼？**
+
+Entity Framework Core，C# 的 ORM，類似 JS 的 Prisma / Sequelize，讓你用 C# 語法操作資料庫，背後自動產生 SQL。
+
 ---
 
 ## 專案架構
